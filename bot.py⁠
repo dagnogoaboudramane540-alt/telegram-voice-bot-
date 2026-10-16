@@ -1,0 +1,58 @@
+import os
+import logging
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+from fishaudio import FishAudio
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+FISH_API_KEY = os.environ.get("FISH_API_KEY")
+VOICE_MODEL_ID = os.environ.get("VOICE_MODEL_ID", "0afea91e5fdf476db23b32dcf61f1e0a")
+
+fish_client = FishAudio(api_key=FISH_API_KEY)
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    user_name = update.message.from_user.first_name
+    logger.info(f"Ricevuto testo da {user_name}: {user_text}")
+
+    await update.message.reply_text("🎙️ Genero il messaggio vocale con la tua voce...")
+
+    try:
+        audio_bytes = fish_client.tts.convert(
+            text=user_text,
+            reference_id=VOICE_MODEL_ID,
+            format="mp3"
+        )
+
+        file_path = "voice_message.mp3"
+        with open(file_path, "wb") as f:
+            f.write(audio_bytes)
+
+        with open(file_path, "rb") as audio_file:
+            await update.message.reply_voice(voice=audio_file)
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+    except Exception as e:
+        logger.error(f"Errore durante la generazione dell'audio: {e}")
+        await update.message.reply_text(f"❌ Si è verificato un errore: {e}")
+
+def main():
+    if not TELEGRAM_TOKEN or not FISH_API_KEY:
+        logger.error("Mancano le chiavi di sicurezza (TELEGRAM_TOKEN o FISH_API_KEY)!")
+        return
+
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
+
+    logger.info("Bot avviato e in ascolto...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
