@@ -1,2 +1,3 @@
-python-telegram-bot==21.10
-fishaudio
+python-telegram-bot[webhooks]==21.10
+fish-audio-sdk>=1.0.0
+
